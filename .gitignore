@@ -1,0 +1,27 @@
+# Python-generated files & virtual environments
+.venv/
+__pycache__/
+*.pyc
+*.py[oc]
+dist/
+build/
+wheels/
+*.egg-info/
+*.egg-info
+.pytest_cache/
+.ruff_cache/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Media snapshots & recordings
+*.jpeg
+*.jpg
+*.png
+*.mp4
+
+# Live server dumps & configs
+live_dump*.json
+*go2rtc.yaml
