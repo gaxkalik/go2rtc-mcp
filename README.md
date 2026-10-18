@@ -124,25 +124,22 @@ npx @modelcontextprotocol/inspector uv run go2rtc-mcp
 
 ---
 
-## MCP Client Configuration (Linux, macOS, Windows)
+## MCP Client Configuration (Claude Desktop, Cursor, Antigravity)
 
-### Linux (`~/.config/Claude/claude_desktop_config.json` or `~/.gemini/config/mcp_config.json`)
+### Option A: Using `uvx` from PyPI (Recommended - No Clone Needed)
+Add `go2rtc` to your client configuration file:
+- **Linux**: `~/.config/Claude/claude_desktop_config.json` or `~/.gemini/config/mcp_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
 ```json
 {
   "mcpServers": {
     "go2rtc": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/home/user/go2rtc-mcp",
-        "run",
-        "go2rtc-mcp"
-      ],
+      "command": "uvx",
+      "args": ["go2rtc-mcp"],
       "env": {
         "GO2RTC_URL": "http://localhost:1984",
-        "GO2RTC_USERNAME": "",
-        "GO2RTC_PASSWORD": "",
-        "GO2RTC_TIMEOUT": "15.0",
         "GO2RTC_ALLOW_EXEC_STREAMS": "false"
       }
     }
@@ -150,13 +147,27 @@ npx @modelcontextprotocol/inspector uv run go2rtc-mcp
 }
 ```
 
-> **Note**: Adjust `/home/user/go2rtc-mcp` (or `/config/go2rtc-mcp` on Home Assistant) to your actual installation path. Ensure `uv` is in your system `PATH` (e.g. `/home/user/.cargo/bin/uv` or `/usr/local/bin/uv`).
-
-### macOS (`~/Library/Application Support/Claude/claude_desktop_config.json`)
-Replace the directory path with `/Users/username/go2rtc-mcp`.
-
-### Windows (`%APPDATA%\Claude\claude_desktop_config.json`)
-Replace the directory path with `C:/Users/username/go2rtc-mcp`.
+### Option B: From Local Source Clone
+If running from a cloned local repository:
+```json
+{
+  "mcpServers": {
+    "go2rtc": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/go2rtc-mcp",
+        "run",
+        "go2rtc-mcp"
+      ],
+      "env": {
+        "GO2RTC_URL": "http://localhost:1984",
+        "GO2RTC_ALLOW_EXEC_STREAMS": "false"
+      }
+    }
+  }
+}
+```
 
 ---
 
