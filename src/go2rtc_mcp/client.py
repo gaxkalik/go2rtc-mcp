@@ -57,7 +57,9 @@ class Go2RtcClient:
         timeout: float | None = None,
     ) -> httpx.Response:
         if self._external_client is not None:
-            return await self._send(self._external_client, method, path, params=params, timeout=timeout)
+            return await self._send(
+                self._external_client, method, path, params=params, timeout=timeout
+            )
 
         async with self._build_client() as client:
             return await self._send(client, method, path, params=params, timeout=timeout)
@@ -82,9 +84,10 @@ class Go2RtcClient:
             return response
         except httpx.HTTPStatusError as exc:
             body_preview = redact_uri_credentials(exc.response.text[:300])
+            status = exc.response.status_code
             raise Go2RtcClientError(
-                f"go2rtc API returned HTTP {exc.response.status_code} for {method} {path}: {body_preview}",
-                status_code=exc.response.status_code,
+                f"go2rtc API returned HTTP {status} for {method} {path}: {body_preview}",
+                status_code=status,
             ) from exc
         except httpx.RequestError as exc:
             raise Go2RtcClientError(
@@ -98,7 +101,7 @@ class Go2RtcClient:
         return redact_sensitive_data(data)
 
     async def list_streams(self) -> dict[str, Any]:
-        """Fetch all configured and active streams (`GET /api/streams`) with credentials redacted."""
+        """Fetch all configured and active streams (`GET /api/streams`) with redaction."""
         response = await self._request("GET", "/api/streams")
         data = response.json()
         return redact_sensitive_data(data)
@@ -106,7 +109,7 @@ class Go2RtcClient:
     async def get_stream(self, stream_name: str, *, probe: bool = False) -> dict[str, Any]:
         """Fetch information for a single stream (`GET /api/streams?src=<stream_name>`).
 
-        If `probe=True`, queries `video=all&audio=all&microphone` to actively inspect codecs and SDP.
+        If `probe=True`, queries `video=all&audio=all` to actively inspect codecs and SDP.
         """
         name = stream_name.strip()
         if not name:
@@ -208,7 +211,6 @@ class Go2RtcClient:
         response = await self._request("GET", "/api/config")
         raw_yaml = response.text
 
-        # First sanitize structurally via PyYAML if valid YAML, then also run text sanitizer
         try:
             parsed = yaml.safe_load(raw_yaml)
             if isinstance(parsed, (dict, list)):
@@ -266,7 +268,7 @@ class Go2RtcClient:
             return redact_uri_credentials(response.text)
 
     async def get_stream_urls(self, stream_name: str) -> dict[str, str]:
-        """Build safe playback & snapshot URLs for a stream (HTTP, WebRTC, HLS, MP4, MJPEG, RTSP)."""
+        """Build safe playback & snapshot URLs for a stream (WebRTC, HLS, MP4, MJPEG, RTSP)."""
         name = stream_name.strip()
         if not name:
             raise ValueError("stream_name must not be empty.")
