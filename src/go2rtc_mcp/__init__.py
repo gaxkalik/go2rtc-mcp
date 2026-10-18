@@ -8,7 +8,7 @@ from go2rtc_mcp.security import (
     redact_uri_credentials,
     validate_stream_source,
 )
-from go2rtc_mcp.server import main, mcp, server
+from go2rtc_mcp.server import main, mcp
 
 __all__ = [
     "Go2RtcClient",
@@ -19,6 +19,5 @@ __all__ = [
     "mcp",
     "redact_sensitive_data",
     "redact_uri_credentials",
-    "server",
     "validate_stream_source",
 ]
