@@ -1,15 +1,16 @@
 # go2rtc-mcp
 
-A production-grade **Model Context Protocol (MCP)** server for [go2rtc](https://github.com/AlexxIT/go2rtc) (including Home Assistant's built-in `go2rtc` instance). `go2rtc-mcp` allows AI assistants and MCP clients to inspect camera streams, probe live video/audio codecs, capture JPEG snapshots, generate streaming playback URLs (WebRTC, MSE, HLS, MP4, MJPEG, RTSP), discover camera sources, and manage streams dynamically—with **strict, automatic credential redaction**.
+A production-grade **Model Context Protocol (MCP)** server for [go2rtc](https://github.com/AlexxIT/go2rtc) (including Home Assistant's built-in `go2rtc` service). Designed primarily for **Linux** environments (Home Assistant Supervised/OS, Debian/Ubuntu, Docker, and headless media servers), `go2rtc-mcp` enables AI assistants and MCP clients to inspect camera streams, probe video/audio codecs, capture live JPEG snapshots, generate streaming playback URLs (WebRTC, MSE, HLS, MP4, MJPEG, RTSP), discover camera integrations, and manage streams dynamically—with **strict, automated credential redaction**.
 
 ---
 
 ## Table of Contents
 
 - [Architecture & Security Guardrails](#architecture--security-guardrails)
-- [Installation & Quick Start](#installation--quick-start)
+- [Linux Installation & Quick Start](#linux-installation--quick-start)
 - [Configuration](#configuration)
-- [Connecting an MCP Client](#connecting-an-mcp-client)
+- [MCP Client Configuration (Linux, macOS, Windows)](#mcp-client-configuration-linux-macos-windows)
+- [Running as a Systemd Service (Linux)](#running-as-a-systemd-service-linux)
 - [Usage Guide](#usage-guide)
   - [Example Natural-Language Prompts](#example-natural-language-prompts)
   - [MCP Tools Reference & Examples](#mcp-tools-reference--examples)
@@ -24,14 +25,14 @@ A production-grade **Model Context Protocol (MCP)** server for [go2rtc](https://
 
 ## Architecture & Security Guardrails
 
-Live `go2rtc` API responses (`/api/streams`, `/api/config`, `/api/hass`, `/api/log`) regularly include plaintext or URL-encoded camera credentials and session tokens inside producer URLs. `go2rtc-mcp` is architected to prevent credential leakage and remote command execution:
+Live `go2rtc` API endpoints (`/api/streams`, `/api/config`, `/api/hass`, `/api/log`) regularly return plaintext or URL-encoded camera credentials and authentication tokens in RTSP producer URLs. `go2rtc-mcp` enforces defense-in-depth security:
 
 ### 1. Centralized Recursive Credential Redaction (`redact_sensitive_data`)
-Every MCP tool output, MCP resource payload, client exception message, and log record passes through [`redact_sensitive_data`](src/go2rtc_mcp/security.py):
-- **URI Credential Masking**: Masks credentials in any URI scheme (`rtsp://`, `rtsps://`, `http://`, `https://`, `rtmp://`, `onvif://`, `dvrip://`, including chained prefixes such as `ffmpeg:rtsp://...`).
-- **Query Token Masking**: Masks sensitive URL query parameters (`token`, `access_token`, `auth`, `password`, `pass`, `pwd`, `secret`, `api_key`, `jwt`).
-- **Recursive Dict Key & Value Sanitization**: Sanitizes both dictionary keys and values (important because `go2rtc` sometimes uses raw RTSP URLs as stream keys), lists, tuples, sets, Pydantic models, and multiline YAML configs.
-- **Log Filtering**: Attaches `RedactingLoggingFilter` to `httpx`, `httpcore`, `mcp`, and `go2rtc_mcp` loggers so credentials never appear in console/stderr logs.
+Every MCP tool return value, MCP resource response, client error message, and log record passes through [`redact_sensitive_data`](src/go2rtc_mcp/security.py):
+- **Universal URI Credential Masking**: Masks credentials in any URI scheme (`rtsp://`, `rtsps://`, `http://`, `https://`, `rtmp://`, `onvif://`, `dvrip://`, including chained prefixes like `ffmpeg:rtsp://...`).
+- **Query Parameter Token Masking**: Masks sensitive query parameters (`token`, `access_token`, `auth`, `password`, `pass`, `pwd`, `secret`, `api_key`, `jwt`).
+- **Recursive Dict Key & Value Sanitization**: Sanitizes both dictionary keys and values (crucial because `go2rtc` creates dynamic stream keys named after raw RTSP URLs), lists, tuples, sets, Pydantic models, and multiline YAML text.
+- **Log Stream Redaction**: Attaches `RedactingLoggingFilter` to `httpx`, `httpcore`, `mcp`, and `go2rtc_mcp` loggers so credentials never reach `stdout`/`stderr` or `journald`.
 
 **Example Transformation:**
 ```text
@@ -45,31 +46,36 @@ Returned by go2rtc-mcp:
 ```
 
 ### 2. Command Execution Guardrail (`GO2RTC_ALLOW_EXEC_STREAMS`)
-`go2rtc` supports `exec:`, `echo:`, and `expr:` stream sources that execute shell commands on the host. By default (`GO2RTC_ALLOW_EXEC_STREAMS=false`), `go2rtc-mcp` rejects any `add_stream` or `update_stream` call containing `exec:`, `echo:`, or `expr:` (including chained forms like `ffmpeg:exec:...`) before any network request is made.
+`go2rtc` allows stream sources starting with `exec:`, `echo:`, and `expr:` to execute host shell commands. By default (`GO2RTC_ALLOW_EXEC_STREAMS=false`), `go2rtc-mcp` rejects any `add_stream` or `update_stream` request containing `exec:`, `echo:`, or `expr:` (including chained forms like `ffmpeg:exec:...`) before any network request is issued.
 
 ---
 
-## Installation & Quick Start
+## Linux Installation & Quick Start
 
 ### Prerequisites
+- **Linux** (Debian, Ubuntu, Alpine, Arch, Fedora, Raspberry Pi OS, etc.)
 - **Python** `>= 3.11`
-- **[uv](https://docs.astral.sh/uv/)** package manager
-- Access to a running `go2rtc` instance (standalone or Home Assistant port `1984`)
+- **[uv](https://docs.astral.sh/uv/)** package manager (recommended: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Access to your `go2rtc` instance (e.g. `http://localhost:1984` or local network IP)
 
-### 1. Clone and Install Dependencies
-```powershell
+### 1. Clone the Repository
+```bash
 git clone https://github.com/gaxkalik/go2rtc-mcp.git
 cd go2rtc-mcp
+```
+
+### 2. Install Dependencies with `uv`
+```bash
 uv sync
 ```
 
-### 2. Configure Environment
-Copy `.env.example` to `.env` and set your `go2rtc` server URL:
-```powershell
-Copy-Item .env.example .env
+### 3. Configure Environment Variables
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
 ```
 
-Edit `.env`:
+Edit `.env` using your preferred editor (`nano .env` or `vim .env`):
 ```env
 GO2RTC_URL=http://localhost:1984
 GO2RTC_USERNAME=
@@ -78,14 +84,14 @@ GO2RTC_TIMEOUT=15.0
 GO2RTC_ALLOW_EXEC_STREAMS=false
 ```
 
-### 3. Run the MCP Server
-```powershell
-# Run over stdio transport (default for MCP clients)
+### 4. Run and Test the MCP Server
+Run over `stdio` transport (standard for MCP clients):
+```bash
 uv run go2rtc-mcp
 ```
 
-To interactively test tools and resources in your browser using the official MCP Inspector:
-```powershell
+Or test interactively in your browser with the official MCP Inspector:
+```bash
 npx @modelcontextprotocol/inspector uv run go2rtc-mcp
 ```
 
@@ -93,23 +99,21 @@ npx @modelcontextprotocol/inspector uv run go2rtc-mcp
 
 ## Configuration
 
-`go2rtc-mcp` reads configuration from environment variables (and automatically loads a local `.env` file if present):
+`go2rtc-mcp` loads settings from environment variables (and automatically reads a local `.env` file if present):
 
 | Environment Variable | Default | Description |
 | :--- | :--- | :--- |
 | `GO2RTC_URL` | `http://localhost:1984` | Base HTTP/HTTPS URL of your `go2rtc` server |
-| `GO2RTC_USERNAME` | *(empty)* | Optional HTTP Basic Auth username if `go2rtc` API auth is enabled |
+| `GO2RTC_USERNAME` | *(empty)* | Optional HTTP Basic Auth username |
 | `GO2RTC_PASSWORD` | *(empty)* | Optional HTTP Basic Auth password |
-| `GO2RTC_TIMEOUT` | `15.0` | HTTP request timeout in seconds (increase if camera snapshots take longer) |
-| `GO2RTC_ALLOW_EXEC_STREAMS` | `false` | Set to `true` only if you explicitly want to allow `exec:` / `echo:` / `expr:` streams |
+| `GO2RTC_TIMEOUT` | `15.0` | Request timeout in seconds |
+| `GO2RTC_ALLOW_EXEC_STREAMS` | `false` | Set to `true` only if you explicitly allow `exec:` / `echo:` / `expr:` sources |
 
 ---
 
-## Connecting an MCP Client
+## MCP Client Configuration (Linux, macOS, Windows)
 
-### Claude Desktop / Cursor / Antigravity / Windsurf
-Add the following entry to your MCP client configuration file (e.g., `claude_desktop_config.json` or `mcp_config.json`):
-
+### Linux (`~/.config/Claude/claude_desktop_config.json` or `~/.gemini/config/mcp_config.json`)
 ```json
 {
   "mcpServers": {
@@ -117,7 +121,7 @@ Add the following entry to your MCP client configuration file (e.g., `claude_des
       "command": "uv",
       "args": [
         "--directory",
-        "C:/Users/Bart/go2rtc-mcp",
+        "/home/user/go2rtc-mcp",
         "run",
         "go2rtc-mcp"
       ],
@@ -133,26 +137,66 @@ Add the following entry to your MCP client configuration file (e.g., `claude_des
 }
 ```
 
+> **Note**: Adjust `/home/user/go2rtc-mcp` (or `/config/go2rtc-mcp` on Home Assistant) to your actual installation path. Ensure `uv` is in your system `PATH` (e.g. `/home/user/.cargo/bin/uv` or `/usr/local/bin/uv`).
+
+### macOS (`~/Library/Application Support/Claude/claude_desktop_config.json`)
+Replace the directory path with `/Users/username/go2rtc-mcp`.
+
+### Windows (`%APPDATA%\Claude\claude_desktop_config.json`)
+Replace the directory path with `C:/Users/username/go2rtc-mcp`.
+
+---
+
+## Running as a Systemd Service (Linux)
+
+If you wish to run `go2rtc-mcp` as a persistent background daemon or manage it through Linux `systemctl`:
+
+Create `/etc/systemd/system/go2rtc-mcp.service`:
+```ini
+[Unit]
+Description=go2rtc Model Context Protocol Server
+After=network.target
+
+[Service]
+Type=simple
+User=user
+WorkingDirectory=/home/user/go2rtc-mcp
+EnvironmentFile=/home/user/go2rtc-mcp/.env
+ExecStart=/home/user/.cargo/bin/uv run go2rtc-mcp
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now go2rtc-mcp
+sudo systemctl status go2rtc-mcp
+```
+
 ---
 
 ## Usage Guide
 
 ### Example Natural-Language Prompts
-Once connected to an MCP client, you can ask your AI assistant:
-- *"List all cameras configured on my go2rtc server and check which ones have active consumers."*
-- *"Capture a live snapshot from `door_camera` and `garage_camera` and describe what you see."*
-- *"Probe `door_camera` to check its video/audio codecs, resolution, and RTSP transport protocol."*
-- *"Give me the WebRTC viewer URL, HLS `.m3u8` URL, and RTSP URL for `outside_camera`."*
-- *"Discover any Home Assistant or ONVIF camera sources available to go2rtc."*
-- *"Check the recent go2rtc server logs for any connection or decoding warnings."*
+Ask your AI assistant:
+- *"List all cameras configured on my go2rtc server."*
+- *"Take a snapshot of `door_camera` and describe the current scene."*
+- *"Perform a security patrol across all active cameras."*
+- *"Probe `garage_camera` codecs, resolution, and RTSP protocol."*
+- *"Generate WebRTC viewer, HLS (.m3u8), and RTSP playback links for `outside_camera`."*
+- *"Check recent go2rtc logs for connection errors or offline feeds."*
 
 ---
 
 ### MCP Tools Reference & Examples
 
 #### 1. `get_server_info()`
-Fetches `go2rtc` server metadata (`GET /api`).
-- **Returns:**
+Fetches `go2rtc` version, revision, host, and RTSP port (`GET /api`).
+- **Sample Output:**
   ```json
   {
     "config_path": "/config/go2rtc.yaml",
@@ -167,8 +211,8 @@ Fetches `go2rtc` server metadata (`GET /api`).
   ```
 
 #### 2. `list_streams()`
-Lists all configured and active streams (`GET /api/streams`) with producer credentials automatically masked.
-- **Returns:**
+Lists all configured and active streams (`GET /api/streams`) with credentials automatically masked.
+- **Sample Output:**
   ```json
   {
     "door_camera": {
@@ -177,7 +221,7 @@ Lists all configured and active streams (`GET /api/streams`) with producer crede
           "url": "rtsp://***:***@192.0.2.10:554/Streaming/Channels/101"
         }
       ],
-      "consumers": null
+      "consumers": []
     },
     "garage_camera": {
       "producers": [
@@ -185,27 +229,23 @@ Lists all configured and active streams (`GET /api/streams`) with producer crede
           "url": "rtsp://***:***@192.0.2.11:554/Streaming/Channels/101"
         }
       ],
-      "consumers": null
+      "consumers": []
     }
   }
   ```
 
 #### 3. `get_stream_info(stream_name: str, probe: bool = False)`
-Fetches producer and consumer state for a single camera stream (`GET /api/streams?src=<stream_name>`). Pass `probe=True` to actively query video/audio codecs and SDP tracks.
+Fetches producer and consumer state for a specific camera (`GET /api/streams?src=<stream_name>`). Pass `probe=True` to query live codecs and SDP.
 
 #### 4. `probe_stream(stream_name: str)`
-Actively probes a stream (`GET /api/streams?src=<stream_name>&video=all&audio=all`) to inspect active codecs (H264, H265, AAC, PCMA, OPUS), SDP metadata, remote address, protocol (`rtsp+tcp`), and received bytes.
+Actively queries `GET /api/streams?src=<stream_name>&video=all&audio=all` to inspect active codecs (H.264, H.265, AAC, PCMA, Opus), SDP tracks, protocol (`rtsp+tcp`), and byte counters.
 
 #### 5. `get_stream_snapshot(stream_name: str, width: int | None = None, height: int | None = None)`
-Captures a live JPEG frame from `stream_name` (`GET /api/frame.jpeg?src=<stream_name>`) and returns it as a native MCP `Image` (`image/jpeg`) so multimodal LLMs can view the camera feed directly.
-- **Arguments:**
-  - `stream_name` *(required)*: Camera stream identifier (e.g., `"door_camera"`).
-  - `width` *(optional)*: Target width in pixels (e.g., `1280`).
-  - `height` *(optional)*: Target height in pixels (e.g., `720`).
+Captures a live JPEG frame from `stream_name` (`GET /api/frame.jpeg?src=<stream_name>`) and returns it as a native MCP `Image` (`image/jpeg`) for multimodal vision models.
 
 #### 6. `get_stream_urls(stream_name: str)`
-Generates ready-to-use playback and snapshot URLs for a stream based on the server's HTTP and RTSP listeners.
-- **Returns:**
+Generates ready-to-use streaming URLs for web, mobile, and NVR playback:
+- **Sample Output:**
   ```json
   {
     "stream": "door_camera",
@@ -221,48 +261,47 @@ Generates ready-to-use playback and snapshot URLs for a stream based on the serv
   ```
 
 #### 7. `add_stream(stream_name: str, source_url: str)`
-Dynamically registers or overwrites a stream (`PUT /api/streams?name=<stream_name>&src=<source_url>`). Validates `source_url` against `GO2RTC_ALLOW_EXEC_STREAMS` and redacts credentials in the confirmation payload.
+Dynamically registers or updates a stream (`PUT /api/streams?name=<name>&src=<url>`), validating against `GO2RTC_ALLOW_EXEC_STREAMS`.
 
 #### 8. `update_stream(stream_name: str, source_url: str)`
-Dynamically updates an existing stream (`PATCH /api/streams?name=<stream_name>&src=<source_url>`).
+Dynamically updates an existing stream source (`PATCH /api/streams`).
 
 #### 9. `delete_stream(stream_name: str)`
-Removes a dynamically registered stream (`DELETE /api/streams?src=<stream_name>`).
+Removes a dynamically registered stream (`DELETE /api/streams?src=<name>`).
 
 #### 10. `get_config()`
-Retrieves the server's `go2rtc.yaml` configuration (`GET /api/config`) with all embedded credentials, passwords, and tokens redacted.
+Retrieves sanitized `go2rtc.yaml` configuration (`GET /api/config`) with all secrets masked.
 
 #### 11. `get_server_logs(limit: int = 50)`
-Fetches the most recent `limit` structured log entries from `GET /api/log` with any embedded credentials masked.
+Fetches recent `go2rtc` log entries (`GET /api/log`) with credentials redacted.
 
 #### 12. `discover_sources(provider: str = "hass")`
-Queries a `go2rtc` discovery integration (`GET /api/<provider>`) to list discoverable cameras/streams with credentials redacted.
-- **Supported providers:** `hass`, `onvif`, `dvrip`, `homekit`, `roborock`, `webtorrent`, `alsa`, `v4l2`.
+Discovers stream sources from integrations (`hass`, `onvif`, `dvrip`, `homekit`, `roborock`, `webtorrent`).
 
 ---
 
 ### MCP Resources Reference
-
-MCP clients that support resource URIs can read these resources directly:
 
 | Resource URI | MIME Type | Description |
 | :--- | :--- | :--- |
 | `go2rtc://server/info` | `application/json` | Server version, revision, host, and RTSP listener config |
 | `go2rtc://streams` | `application/json` | Complete dictionary of streams with redacted producer URLs |
 | `go2rtc://streams/{stream_name}` | `application/json` | Producer and consumer details for `{stream_name}` |
-| `go2rtc://config` | `text/yaml` | Sanitized `go2rtc.yaml` configuration file |
+| `go2rtc://config` | `text/yaml` | Sanitized `go2rtc.yaml` configuration |
 
 ---
 
 ### MCP Prompts Reference
 
-- **`diagnose_stream(stream_name: str)`**: Generates a structured troubleshooting workflow instructing the assistant to probe codecs/SDP, capture a verification snapshot, inspect recent server logs, and summarize stream health for `stream_name`.
+- **`snapshot_all`**: Captures live frames from all cameras and generates a multi-camera visual security summary.
+- **`security_patrol`**: Full security assessment combining stream health, frame capture, and log error analysis.
+- **`diagnose_stream(stream_name)`**: Guided step-by-step diagnostic workflow for troubleshooting a camera.
+- **`camera_urls(stream_name)`**: Formats all direct streaming integration links.
+- **`stream_health_check`**: System-wide health audit of all streams, codecs, and logs.
 
 ---
 
 ### Programmatic Python Usage
-
-You can also use `Go2RtcClient` and `redact_sensitive_data` directly in Python scripts:
 
 ```python
 import asyncio
@@ -273,22 +312,20 @@ async def main() -> None:
     settings = Go2RtcSettings.from_env()
     client = Go2RtcClient(settings=settings)
 
-    # 1. Server info
+    # 1. Fetch server metadata
     info = await client.get_server_info()
     print("Server version:", info.get("version"))
 
-    # 2. List streams (credentials automatically masked as scheme://***:***@host...)
+    # 2. List streams (credentials automatically masked)
     streams = await client.list_streams()
     for name, data in streams.items():
         print(f"Stream: {name} -> {data}")
 
     # 3. Capture a live JPEG snapshot
     jpeg_bytes = await client.get_snapshot("door_camera", width=1280)
-    print(f"Captured {len(jpeg_bytes)} bytes from door_camera")
-
-    # 4. Standalone sanitizer usage
-    safe = redact_sensitive_data("rtsp://admin:mockpass%2A@192.0.2.10:554/stream1")
-    assert safe == "rtsp://***:***@192.0.2.10:554/stream1"
+    with open("door_snapshot.jpg", "wb") as f:
+        f.write(jpeg_bytes)
+    print("Saved door_snapshot.jpg")
 
 
 if __name__ == "__main__":
@@ -305,7 +342,7 @@ go2rtc-mcp/
 ├── .gitignore                   # Excludes .env, snapshots (*.jpg/*.png/*.mp4), and live dumps
 ├── LICENSE                      # MIT License
 ├── pyproject.toml               # Package metadata, dependencies, pytest & ruff config
-├── README.md                    # Project documentation and usage guide
+├── README.md                    # Project documentation and Linux usage guide
 ├── src/
 │   └── go2rtc_mcp/
 │       ├── __init__.py          # Public package exports
@@ -325,11 +362,11 @@ go2rtc-mcp/
 
 ## Development & Testing
 
-All unit tests use synthetic RFC 5737 (`192.0.2.0/24`) addresses and mock credentials via `respx` so tests run offline and deterministically.
+All unit tests use synthetic RFC 5737 (`192.0.2.0/24`) test fixtures and mock responses via `respx` so tests run offline and deterministically on Linux:
 
-```powershell
-# Run the full test suite
-uv run pytest -v
+```bash
+# Run unit tests
+uv run python -m pytest -v
 
 # Run ruff linter
 uv run ruff check src/ tests/
