@@ -58,7 +58,7 @@ Returned by go2rtc-mcp:
 
 ### 1. Clone and Install Dependencies
 ```powershell
-git clone <repository-url>
+git clone https://github.com/gaxkalik/go2rtc-mcp.git
 cd go2rtc-mcp
 uv sync
 ```

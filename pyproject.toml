@@ -4,7 +4,15 @@ version = "0.1.0"
 description = "Production-grade Model Context Protocol (MCP) server for go2rtc streaming servers"
 readme = "README.md"
 license = "MIT"
+authors = [
+    { name = "Armen", email = "gaxkalik@gmail.com" }
+]
 requires-python = ">=3.11"
+
+[project.urls]
+Homepage = "https://github.com/gaxkalik/go2rtc-mcp"
+Repository = "https://github.com/gaxkalik/go2rtc-mcp"
+Issues = "https://github.com/gaxkalik/go2rtc-mcp/issues"
 dependencies = [
     "httpx>=0.28.1",
     "mcp[cli]>=1.2.0",
