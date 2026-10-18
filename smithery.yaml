@@ -9,7 +9,7 @@ startCommand:
       go2rtcUrl:
         type: string
         title: "go2rtc URL"
-        description: "Base HTTP URL of your go2rtc server (e.g. http://localhost:1984 or http://192.168.1.210:1984)"
+        description: "Base HTTP URL of your go2rtc server"
         default: "http://localhost:1984"
       go2rtcUsername:
         type: string
