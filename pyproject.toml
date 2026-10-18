@@ -18,6 +18,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/gaxkalik/go2rtc-mcp"
+Documentation = "https://gaxkalik.github.io/go2rtc-mcp/"
 Repository = "https://github.com/gaxkalik/go2rtc-mcp"
 Issues = "https://github.com/gaxkalik/go2rtc-mcp/issues"
 

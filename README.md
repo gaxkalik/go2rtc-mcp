@@ -1,6 +1,7 @@
 # go2rtc-mcp
 
 [![PyPI version](https://img.shields.io/pypi/v/go2rtc-mcp.svg)](https://pypi.org/project/go2rtc-mcp/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg)](https://gaxkalik.github.io/go2rtc-mcp/)
 [![Python versions](https://img.shields.io/pypi/pyversions/go2rtc-mcp.svg)](https://pypi.org/project/go2rtc-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
