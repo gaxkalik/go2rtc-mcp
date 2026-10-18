@@ -106,3 +106,16 @@ async def test_server_tools_and_resources_redact_credentials() -> None:
 
     prompt_text = server.diagnose_stream("door_camera")
     assert "door_camera" in prompt_text
+
+    snap_all_prompt = server.snapshot_all()
+    assert "visual security patrol" in snap_all_prompt
+
+    patrol_prompt = server.security_patrol()
+    assert "security and visual patrol" in patrol_prompt
+
+    urls_prompt = server.camera_urls("garage_camera")
+    assert "garage_camera" in urls_prompt
+
+    health_prompt = server.stream_health_check()
+    assert "streaming health audit" in health_prompt
+

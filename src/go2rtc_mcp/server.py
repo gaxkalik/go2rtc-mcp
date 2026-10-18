@@ -208,6 +208,61 @@ def diagnose_stream(stream_name: str) -> str:
     )
 
 
+@mcp.prompt()
+def snapshot_all() -> str:
+    """Prompt to capture live snapshots from all configured cameras and summarize each scene."""
+    return (
+        "Please perform a multi-camera visual security patrol:\n"
+        "1. Call `list_streams()` to get all active camera stream names.\n"
+        "2. For each camera, call `get_stream_snapshot(stream_name)`.\n"
+        "3. Inspect each captured camera snapshot.\n"
+        "4. Provide a structured visual summary for each camera (lighting, objects, activities)."
+    )
+
+
+@mcp.prompt()
+def security_patrol() -> str:
+    """Prompt to check stream health, probe codecs, and capture camera frames."""
+    return (
+        "Please perform a comprehensive go2rtc security and visual patrol:\n"
+        "1. Call `get_server_info()` to verify server revision and RTSP port.\n"
+        "2. Call `list_streams()` to identify all available camera streams.\n"
+        "3. For each active camera, call `get_stream_snapshot(stream_name)` and describe it.\n"
+        "4. Call `get_server_logs(limit=50)` to ensure no connection drops occurred.\n"
+        "5. Compile an overall security patrol report."
+    )
+
+
+@mcp.prompt()
+def camera_urls(stream_name: str) -> str:
+    """Prompt to fetch and format all direct streaming links for a camera."""
+    return (
+        f"Please generate the complete streaming integration links for camera '{stream_name}':\n"
+        f"1. Call `get_stream_urls(stream_name='{stream_name}')`.\n"
+        "2. Format the response with clickable markdown links for:\n"
+        "   - WebRTC interactive viewer\n"
+        "   - MSE low-latency viewer\n"
+        "   - HLS (.m3u8) mobile stream\n"
+        "   - MP4 snapshot stream\n"
+        "   - Direct RTSP stream URL\n"
+        "   - Live JPEG snapshot URL."
+    )
+
+
+@mcp.prompt()
+def stream_health_check() -> str:
+    """Prompt to check system-wide health, codec compatibility, and stream stability."""
+    return (
+        "Please run a system-wide go2rtc streaming health audit:\n"
+        "1. Call `get_server_info()` to verify host, version, and config path.\n"
+        "2. Call `list_streams()` and count total streams versus active streams.\n"
+        "3. For each stream, call `probe_stream(stream_name)` to verify codec compatibility.\n"
+        "4. Call `get_server_logs(limit=100)` to flag any FFmpeg warnings or RTSP timeout.\n"
+        "5. Provide recommendations for optimizing streaming performance."
+    )
+
+
+
 def main() -> None:
     """Run the go2rtc-mcp server over stdio transport."""
     mcp.run(transport="stdio")
@@ -215,3 +270,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
