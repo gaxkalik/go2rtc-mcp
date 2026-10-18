@@ -13,7 +13,9 @@ except ImportError:  # pragma: no cover
 
 from go2rtc_mcp.client import Go2RtcClient
 from go2rtc_mcp.config import Go2RtcSettings
-from go2rtc_mcp.security import redact_sensitive_data
+from go2rtc_mcp.security import install_log_redaction_filter, redact_sensitive_data
+
+install_log_redaction_filter()
 
 mcp = MCPServer(
     "go2rtc-mcp",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from urllib.parse import unquote
@@ -10,6 +11,11 @@ from pydantic import BaseModel
 
 # Matches any URI starting with scheme:// up to whitespace or quote/angle-bracket delimiters.
 _URI_PATTERN = re.compile(r"([a-zA-Z][a-zA-Z0-9+.-]*://)([^\s\"'<>`]+)")
+
+# Matches URL-encoded scheme%3A%2F%2Fuser%3Apass%40host in query parameters (e.g., httpx logs)
+_ENCODED_URI_CREDENTIALS_PATTERN = re.compile(
+    r"(?i)([a-zA-Z][a-zA-Z0-9+.-]*%3A%2F%2F)([^/&?#\s\"'<>]+?)(%40)"
+)
 
 # Matches sensitive query parameters in URLs (e.g., ?token=..., &password=..., &auth=...)
 _SENSITIVE_QUERY_PARAM_PATTERN = re.compile(
@@ -79,6 +85,7 @@ def redact_uri_credentials(text: str) -> str:
         return text
 
     redacted = _URI_PATTERN.sub(_redact_single_uri, text)
+    redacted = _ENCODED_URI_CREDENTIALS_PATTERN.sub(r"\1***%3A***\3", redacted)
     redacted = _SENSITIVE_QUERY_PARAM_PATTERN.sub(r"\1***", redacted)
     redacted = _YAML_SENSITIVE_LINE_PATTERN.sub(r'\1"***"', redacted)
     return redacted
@@ -136,7 +143,6 @@ def validate_stream_source(source: str, *, allow_exec: bool = False) -> str:
         raise ValueError("Stream source URL cannot be empty.")
 
     if not allow_exec:
-        # Check all colon-separated segments before '//' for dangerous prefixes
         pre_scheme = cleaned.split("://", 1)[0].lower()
         segments = [seg.strip() for seg in pre_scheme.split(":") if seg.strip()]
         for prefix in _DANGEROUS_STREAM_PREFIXES:
@@ -148,3 +154,32 @@ def validate_stream_source(source: str, *, allow_exec: bool = False) -> str:
                 )
 
     return cleaned
+
+
+class RedactingLoggingFilter(logging.Filter):
+    """Logging filter that masks any URI credentials in log messages and arguments."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = redact_uri_credentials(record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = {
+                    k: redact_uri_credentials(str(v)) if isinstance(v, str) else v
+                    for k, v in record.args.items()
+                }
+            elif isinstance(record.args, tuple):
+                record.args = tuple(
+                    redact_uri_credentials(str(arg)) if not isinstance(arg, (int, float)) else arg
+                    for arg in record.args
+                )
+        return True
+
+
+def install_log_redaction_filter() -> None:
+    """Attach RedactingLoggingFilter to root, httpx, httpcore, and go2rtc_mcp loggers."""
+    redacting_filter = RedactingLoggingFilter()
+    for logger_name in ("", "httpx", "httpcore", "go2rtc_mcp", "mcp"):
+        target_logger = logging.getLogger(logger_name)
+        if not any(isinstance(f, RedactingLoggingFilter) for f in target_logger.filters):
+            target_logger.addFilter(redacting_filter)

@@ -157,3 +157,26 @@ def test_validate_stream_source_rejects_empty() -> None:
     """Ensure empty stream sources raise ValueError."""
     with pytest.raises(ValueError, match="cannot be empty"):
         validate_stream_source("   ")
+
+
+def test_redacting_logging_filter_masks_log_records() -> None:
+    """Verify RedactingLoggingFilter masks credentials in log messages and args."""
+    import logging
+
+    from go2rtc_mcp.security import RedactingLoggingFilter
+
+    log_filter = RedactingLoggingFilter()
+    record = logging.LogRecord(
+        name="httpx",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="HTTP Request: PUT http://192.0.2.1:1984/api/streams?src=%s",
+        args=("rtsp://admin:mockpass%2A@192.0.2.10:554/stream1",),
+        exc_info=None,
+    )
+    assert log_filter.filter(record) is True
+    formatted = record.getMessage()
+    assert "mockpass" not in formatted
+    assert "rtsp://***:***@192.0.2.10:554/stream1" in formatted
+
