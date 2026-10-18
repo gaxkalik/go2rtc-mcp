@@ -1,5 +1,9 @@
 # go2rtc-mcp
 
+[![PyPI version](https://img.shields.io/pypi/v/go2rtc-mcp.svg)](https://pypi.org/project/go2rtc-mcp/)
+[![Python versions](https://img.shields.io/pypi/pyversions/go2rtc-mcp.svg)](https://pypi.org/project/go2rtc-mcp/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A production-grade **Model Context Protocol (MCP)** server for [go2rtc](https://github.com/AlexxIT/go2rtc) (including Home Assistant's built-in `go2rtc` service). Designed primarily for **Linux** environments (Home Assistant Supervised/OS, Debian/Ubuntu, Docker, and headless media servers), `go2rtc-mcp` enables AI assistants and MCP clients to inspect camera streams, probe video/audio codecs, capture live JPEG snapshots, generate streaming playback URLs (WebRTC, MSE, HLS, MP4, MJPEG, RTSP), discover camera integrations, and manage streams dynamically—with **strict, automated credential redaction**.
 
 ---
@@ -56,9 +60,18 @@ Returned by go2rtc-mcp:
 - **Linux** (Debian, Ubuntu, Alpine, Arch, Fedora, Raspberry Pi OS, etc.)
 - **Python** `>= 3.11`
 - **[uv](https://docs.astral.sh/uv/)** package manager (recommended: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- Access to your `go2rtc` instance (e.g. `http://localhost:1984` or local network IP)
+### Instant Run with uvx (No Clone Required)
+Run `go2rtc-mcp` directly using `uvx` from [PyPI](https://pypi.org/project/go2rtc-mcp/):
+```bash
+# Run over stdio
+GO2RTC_URL=http://localhost:1984 uvx go2rtc-mcp
+```
 
-### 1. Clone the Repository
+---
+
+### Manual Installation from Source
+
+#### 1. Clone the Repository
 ```bash
 git clone https://github.com/gaxkalik/go2rtc-mcp.git
 cd go2rtc-mcp
